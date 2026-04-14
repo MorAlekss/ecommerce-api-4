@@ -1,6 +1,7 @@
 import sys
 sys.path.insert(0, '.')
-from unittest.mock import patch, MagicMock
+import pytest
+from unittest.mock import patch, MagicMock, AsyncMock
 from src.utils.http import get, post, put, patch as http_patch, delete
 from src.utils.middleware import authenticated_get, authenticated_post
 
@@ -23,11 +24,14 @@ def test_post():
         result = post("https://api.example.com/test", {"key": "value"})
         assert result["id"] == "123"
 
-def test_authenticated_get():
-    with patch('src.utils.middleware.requests.get') as mock_get:
-        mock_response = MagicMock()
-        mock_response.json.return_value = {"data": "secure"}
-        mock_response.raise_for_status.return_value = None
-        mock_get.return_value = mock_response
-        result = authenticated_get("https://api.example.com/secure", "token123")
+@pytest.mark.asyncio
+async def test_authenticated_get():
+    mock_response = MagicMock()
+    mock_response.json.return_value = {"data": "secure"}
+    mock_response.raise_for_status.return_value = None
+    mock_client = AsyncMock()
+    mock_client.get.return_value = mock_response
+    with patch('src.utils.middleware.httpx.AsyncClient') as mock_cls:
+        mock_cls.return_value.__aenter__.return_value = mock_client
+        result = await authenticated_get("https://api.example.com/secure", "token123")
         assert result["data"] == "secure"
